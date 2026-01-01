@@ -1,0 +1,22 @@
+{
+  "name": "verified-bounty",
+  "version": "1.0.0",
+  "description": "Vulnerability testing and PoC development for Verified Wallet",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@types/axios": "^0.14.4",
+    "axios": "^1.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
