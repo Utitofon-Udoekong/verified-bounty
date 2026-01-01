@@ -49,3 +49,4 @@ poc/onchain-results.txt
 poc/api-test-results.txt
 
 package-lock.json
+bounty-hunter.js

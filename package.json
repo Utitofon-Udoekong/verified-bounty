@@ -12,7 +12,8 @@
   "type": "commonjs",
   "dependencies": {
     "@types/axios": "^0.14.4",
-    "axios": "^1.13.2"
+    "axios": "^1.13.2",
+    "ethers": "^5.8.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
